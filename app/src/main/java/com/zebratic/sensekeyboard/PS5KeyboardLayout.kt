@@ -167,11 +167,21 @@ class PS5KeyboardLayout @JvmOverloads constructor(
     private fun getActiveRows(): Array<String> {
         if (dialpadMode) return DIALPAD_ROWS
         val base = if (symbolMode) KeyboardLayouts.SYMBOLS.rows else getLetterLayout().rows
-        return if (settings.numberRowEnabled && !symbolMode) {
+        val letterRows = if (settings.numberRowEnabled && !symbolMode) {
             arrayOf("1 2 3 4 5 6 7 8 9 0") + base
         } else {
             base
         }
+        // Add integrated bottom action row (PS5-style)
+        val actionKeys = mutableListOf<String>()
+        actionKeys.add("⇧") // shift
+        if (settings.showSymbolsBtn) actionKeys.add(if (symbolMode) "ABC" else "@#:")
+        if (settings.showDialpadBtn) actionKeys.add(if (dialpadMode) "ABC" else "123")
+        if (settings.showSpacebar) actionKeys.add("␣")
+        if (settings.showVoiceBtn) actionKeys.add("🎤")
+        if (settings.showBackspaceBtn) actionKeys.add("⌫")
+        if (settings.showEnterBtn) actionKeys.add("Done")
+        return letterRows + arrayOf(actionKeys.joinToString(" "))
     }
 
     private fun getChars(row: Int): List<String> = getActiveRows()[row].split(" ")
@@ -191,11 +201,26 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         val h = height.toFloat()
         if (w == 0f || h == 0f) return
 
-        // Spawn 8-12 particles at the focused key position
-        val rows = if (focusRow >= 0) rowCount() else 1
-        val keyH = h * 0.6f / rows
-        val fy = if (focusRow >= 0) h * 0.15f + focusRow * keyH + keyH/2 else h * 0.08f
-        val fx = w * focusCol / 10f + w * 0.05f
+        // Calculate actual key position
+        val sidePad = w * 0.04f
+        val topPad = h * 0.03f
+        val suggestH = if (settings.suggestionsEnabled) h * 0.10f else 0f
+        val hintH = if (settings.showHintBar) h * 0.14f else 0f
+        val keyAreaH = h - topPad - suggestH - hintH
+        val keyAreaW = w - sidePad * 2
+        val rows = rowCount()
+        val maxCols = (0 until rows).maxOf { colCount(it) }
+        val keySpacing = 3f * dp
+        val keyW = (keyAreaW - keySpacing * (maxCols - 1)) / maxCols
+        val keyH = (keyAreaH - keySpacing * (rows - 1)) / rows
+        val keyStartY = topPad + suggestH
+
+        val row = focusRow.coerceAtLeast(0)
+        val cols = if (row < rows) colCount(row) else maxCols
+        val rowW = cols * keyW + (cols - 1) * keySpacing
+        val offsetX = (w - rowW) / 2
+        val fx = offsetX + focusCol * (keyW + keySpacing) + keyW / 2
+        val fy = keyStartY + row * (keyH + keySpacing) + keyH / 2
 
         val count = (8..12).random()
         for (i in 0 until count) {
@@ -260,9 +285,8 @@ class PS5KeyboardLayout @JvmOverloads constructor(
 
         val sidePad = w * 0.04f
         val topPad = h * 0.03f
-        val showSuggestions = settings.suggestionsEnabled && suggestions.isNotEmpty()
-        val suggestH = if (showSuggestions) h * 0.10f else 0f
-        val actionBarH = if (hasActionButtons()) h * 0.11f else 0f
+        val suggestH = if (settings.suggestionsEnabled) h * 0.10f else 0f // always reserved when enabled
+        val actionBarH = 0f // integrated into key grid now
         val hintH = if (settings.showHintBar) h * 0.14f else 0f
         val keyAreaH = h - topPad - suggestH - actionBarH - hintH
         val keyAreaW = w - sidePad * 2
@@ -280,8 +304,8 @@ class PS5KeyboardLayout @JvmOverloads constructor(
             canvas.drawText(lt, w/2, statusY, listenPaint)
         }
 
-        // --- Suggestion row (only if enabled and has suggestions) ---
-        if (showSuggestions) {
+        // --- Suggestion row (always reserved space when enabled, draws when has suggestions) ---
+        if (settings.suggestionsEnabled && suggestions.isNotEmpty()) {
             drawSuggestions(canvas, sidePad, topPad, keyAreaW, suggestH)
         }
 
@@ -389,12 +413,6 @@ class PS5KeyboardLayout @JvmOverloads constructor(
                 val textY = y + keyH/2 - (paint.descent() + paint.ascent()) / 2
                 canvas.drawText(displayChar, x + keyW/2, textY, paint)
             }
-        }
-
-        // --- Action bar ---
-        if (hasActionButtons()) {
-            val actionY = topPad + suggestH + keyAreaH
-            drawActionBar(canvas, sidePad, actionY, keyAreaW, actionBarH)
         }
 
         // --- Hint bar ---
@@ -562,7 +580,7 @@ class PS5KeyboardLayout @JvmOverloads constructor(
 
     fun moveFocus(dx: Int, dy: Int) {
         val minRow = if (settings.suggestionsEnabled && suggestions.isNotEmpty()) -1 else 0
-        val maxRow = if (hasActionButtons()) rowCount() else rowCount() - 1
+        val maxRow = rowCount() - 1
 
         // Vertical movement
         if (dy != 0) {
@@ -579,7 +597,6 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         // Horizontal movement
         val maxCol = when {
             focusRow == -1 -> (suggestions.size - 1).coerceAtLeast(0)
-            hasActionButtons() && focusRow == rowCount() -> (getActionButtons().size - 1).coerceAtLeast(0)
             else -> colCount(focusRow) - 1
         }
 
@@ -644,31 +661,19 @@ class PS5KeyboardLayout @JvmOverloads constructor(
             return
         }
 
-        // Action bar row
-        if (hasActionButtons() && focusRow == rowCount()) {
-            val btns = getActionButtons()
-            if (focusCol < btns.size) {
-                when (btns[focusCol]) {
-                    "←" -> onCursorLeft?.invoke()
-                    "→" -> onCursorRight?.invoke()
-                    "⌫" -> onBackspace?.invoke()
-                    "Space" -> onSpace?.invoke()
-                    "Enter" -> onEnter?.invoke()
-                    "!@#", "ABC" -> toggleLayout()
-                    "123" -> toggleDialpad()
-                    "🎤" -> onSpeech?.invoke()
-                    else -> if (btns[focusCol] == "ABC" && dialpadMode) toggleDialpad()
-                }
-            }
-            return
-        }
-
         val chars = getChars(focusRow)
         if (focusCol < chars.size) {
             var c = chars[focusCol]
-            // Handle special dialpad keys
+            // Handle special keys
             if (c == "←") { onCursorLeft?.invoke(); return }
             if (c == "→") { onCursorRight?.invoke(); return }
+            if (c == "⇧") { shifted = !shifted; invalidate(); return }
+            if (c == "⌫") { onBackspace?.invoke(); return }
+            if (c == "␣") { onSpace?.invoke(); return }
+            if (c == "Done") { onEnter?.invoke(); return }
+            if (c == "🎤") { onSpeech?.invoke(); return }
+            if (c == "@#:" || (c == "ABC" && symbolMode)) { toggleLayout(); return }
+            if (c == "123" || (c == "ABC" && dialpadMode)) { toggleDialpad(); return }
             if (shifted && !symbolMode && !dialpadMode && c.length == 1 && c[0].isLetter()) {
                 c = c.uppercase()
             }

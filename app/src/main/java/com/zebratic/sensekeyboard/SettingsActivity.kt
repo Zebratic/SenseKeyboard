@@ -305,31 +305,69 @@ fun SettingsTab() {
     var dpadSpeed by remember { mutableFloatStateOf(settings.dpadRepeatRate.toFloat()) }
 
     Column {
-    // Inline test input
+    // Inline test input — press X to enter edit mode, navigable past with D-pad
     val focusManager = LocalFocusManager.current
     val settingsFocusTarget = remember { FocusRequester() }
     var testText by remember { mutableStateOf("") }
-    OutlinedTextField(
-        value = testText,
-        onValueChange = { testText = it },
-        modifier = Modifier.fillMaxWidth().height(42.dp)
-            .onKeyEvent { event ->
-                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
-                    (event.key == androidx.compose.ui.input.key.Key.Back || event.key == androidx.compose.ui.input.key.Key.ButtonB)) {
-                    try { settingsFocusTarget.requestFocus() } catch (_: Exception) { focusManager.clearFocus() }
-                    true
-                } else false
-            },
-        placeholder = { Text("Test keyboard here...", color = TextSecondary.copy(alpha = 0.4f), fontSize = 11.sp) },
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextPrimary),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = AccentColor, unfocusedBorderColor = CardBorder,
-            focusedContainerColor = SurfaceColor, unfocusedContainerColor = SurfaceColor,
-            cursorColor = AccentColor
-        ),
-        shape = RoundedCornerShape(8.dp),
-        singleLine = true
-    )
+    var testEditing by remember { mutableStateOf(false) }
+    val testFocusReq = remember { FocusRequester() }
+    var testBoxFocused by remember { mutableStateOf(false) }
+
+    if (testEditing) {
+        OutlinedTextField(
+            value = testText,
+            onValueChange = { testText = it },
+            modifier = Modifier.fillMaxWidth().height(42.dp)
+                .focusRequester(testFocusReq)
+                .onKeyEvent { event ->
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                        (event.key == androidx.compose.ui.input.key.Key.Back || event.key == androidx.compose.ui.input.key.Key.ButtonB)) {
+                        testEditing = false; true
+                    } else false
+                },
+            placeholder = { Text("Type something...", color = TextSecondary.copy(alpha = 0.4f), fontSize = 11.sp) },
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextPrimary),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AccentColor, unfocusedBorderColor = CardBorder,
+                focusedContainerColor = SurfaceColor, unfocusedContainerColor = SurfaceColor,
+                cursorColor = AccentColor
+            ),
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true
+        )
+        LaunchedEffect(Unit) { testFocusReq.requestFocus() }
+    } else {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(36.dp)
+                .onFocusChanged { testBoxFocused = it.isFocused }
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                        (event.key == androidx.compose.ui.input.key.Key.DirectionCenter ||
+                         event.key == androidx.compose.ui.input.key.Key.Enter ||
+                         event.key == androidx.compose.ui.input.key.Key.ButtonA)) {
+                        testEditing = true; true
+                    } else false
+                }
+                .background(
+                    if (testBoxFocused) AccentColor.copy(alpha = 0.15f) else SurfaceColor,
+                    RoundedCornerShape(8.dp)
+                )
+                .border(
+                    if (testBoxFocused) 2.dp else 1.dp,
+                    if (testBoxFocused) AccentColor else CardBorder,
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                if (testText.isEmpty()) "Press ✕ to test keyboard" else testText,
+                color = if (testText.isEmpty()) TextSecondary.copy(alpha = 0.4f) else TextPrimary,
+                fontSize = 11.sp, maxLines = 1
+            )
+        }
+    }
     Spacer(modifier = Modifier.height(10.dp))
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

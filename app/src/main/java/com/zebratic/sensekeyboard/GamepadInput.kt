@@ -24,6 +24,9 @@ object GamepadInput {
     private var l2Pressed = false
     private var r2Pressed = false
     private var stickNavigated = false
+    private var lastL2PressTime = 0L
+    private var shiftLocked = false
+    private const val DOUBLE_TAP_MS = 300L
 
     private var lastDpadTime = 0L
     private var dpadHeldSince = 0L
@@ -82,11 +85,22 @@ object GamepadInput {
         if (event.action != MotionEvent.ACTION_MOVE) return emptyList()
         val actions = mutableListOf<GamepadAction>()
 
-        // L2 trigger (shift)
+        // L2 trigger (shift) — double-tap to lock
         val l2Value = event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
         val l2Now = l2Value > TRIGGER_THRESHOLD
-        if (l2Now && !l2Pressed) actions.add(GamepadAction.SHIFT_ON)
-        else if (!l2Now && l2Pressed) actions.add(GamepadAction.SHIFT_OFF)
+        if (l2Now && !l2Pressed) {
+            val now = System.currentTimeMillis()
+            if (now - lastL2PressTime < DOUBLE_TAP_MS) {
+                // Double tap — toggle shift lock
+                shiftLocked = !shiftLocked
+                actions.add(if (shiftLocked) GamepadAction.SHIFT_ON else GamepadAction.SHIFT_OFF)
+            } else if (!shiftLocked) {
+                actions.add(GamepadAction.SHIFT_ON)
+            }
+            lastL2PressTime = now
+        } else if (!l2Now && l2Pressed && !shiftLocked) {
+            actions.add(GamepadAction.SHIFT_OFF)
+        }
         l2Pressed = l2Now
 
         // R2 trigger — Enter normally, Newline if L2 held
