@@ -33,6 +33,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
@@ -430,10 +432,10 @@ fun SettingsTab() {
                 Spacer(modifier = Modifier.height(8.dp))
                 SectionLabel("Key Colors")
                 Text("Primary (letters)", color = TextSecondary, fontSize = 9.sp)
-                ColorPicker(selected = settings.keyColor, onSelected = { settings.keyColor = it })
+                DarkColorPicker(selected = settings.keyColor, onSelected = { settings.keyColor = it })
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Secondary (numbers, actions)", color = TextSecondary, fontSize = 9.sp)
-                ColorPicker(selected = settings.secondaryKeyColor, onSelected = { settings.secondaryKeyColor = it })
+                DarkColorPicker(selected = settings.secondaryKeyColor, onSelected = { settings.secondaryKeyColor = it })
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -554,6 +556,39 @@ fun SettingsTab() {
             }
         }
     }
+    // Keyboard Preview
+    Spacer(modifier = Modifier.height(10.dp))
+    var showPreview by remember { mutableStateOf(false) }
+    GlassCard {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("Keyboard Preview")
+            Switch(
+                checked = showPreview, onCheckedChange = { showPreview = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White, checkedTrackColor = AccentColor,
+                    uncheckedThumbColor = TextSecondary, uncheckedTrackColor = SurfaceColor
+                ),
+                modifier = Modifier.height(18.dp)
+            )
+        }
+        if (showPreview) {
+            Spacer(modifier = Modifier.height(4.dp))
+            AndroidView(
+                factory = { ctx ->
+                    PS5KeyboardLayout(ctx).apply {
+                        reloadSettings()
+                        // Non-interactive — just visual
+                        isFocusable = false
+                        isClickable = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(160.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                update = { it.reloadSettings() }
+            )
+        }
+    }
     } // close Column wrapper
 }
 
@@ -665,6 +700,73 @@ fun ColorPicker(selected: Int, onSelected: (Int) -> Unit) {
             )
         }
     }
+}
+
+@Composable
+fun DarkColorPicker(selected: Int, onSelected: (Int) -> Unit) {
+    val baseColors = listOf(
+        0xFF2A2D3E.toInt() to "Slate",
+        0xFF1E2133.toInt() to "Navy",
+        0xFF1A1A2E.toInt() to "Indigo",
+        0xFF1B2838.toInt() to "Steel",
+        0xFF121212.toInt() to "Carbon",
+        0xFF1A1D2E.toInt() to "PS5 Dark",
+        0xFF2D2D44.toInt() to "Ash",
+        0xFF0E1020.toInt() to "Abyss",
+        0xFF1E1E2E.toInt() to "Charcoal",
+        0xFF2A2A3A.toInt() to "Pewter"
+    )
+    var brightness by remember { mutableFloatStateOf(1f) }
+
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            baseColors.forEach { (color, _) ->
+                val adjusted = adjustBrightness(color, brightness)
+                val isSelected = colorsClose(selected, adjusted)
+                var isFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier.size(22.dp)
+                        .onFocusChanged { isFocused = it.isFocused }
+                        .focusable()
+                        .onKeyEvent { event ->
+                            if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                                (event.key == androidx.compose.ui.input.key.Key.DirectionCenter ||
+                                 event.key == androidx.compose.ui.input.key.Key.Enter ||
+                                 event.key == androidx.compose.ui.input.key.Key.ButtonA)) {
+                                onSelected(adjusted); true
+                            } else false
+                        }
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(adjusted.toLong() or 0xFF000000L))
+                        .border(
+                            when { isSelected -> 3.dp; isFocused -> 2.dp; else -> 1.dp },
+                            when { isSelected -> Color.White; isFocused -> AccentColor; else -> Color(0x22FFFFFF) },
+                            RoundedCornerShape(4.dp)
+                        )
+                        .clickable { onSelected(adjusted) }
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingSlider("Brightness", brightness * 100f, 20f, 200f, "%") {
+            brightness = it / 100f
+        }
+    }
+}
+
+private fun adjustBrightness(color: Int, factor: Float): Int {
+    val r = ((color shr 16 and 0xFF) * factor).toInt().coerceIn(0, 255)
+    val g = ((color shr 8 and 0xFF) * factor).toInt().coerceIn(0, 255)
+    val b = ((color and 0xFF) * factor).toInt().coerceIn(0, 255)
+    return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+}
+
+private fun colorsClose(a: Int, b: Int): Boolean {
+    // Fuzzy match since brightness adjustments may not be exact
+    val dr = kotlin.math.abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF))
+    val dg = kotlin.math.abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF))
+    val db = kotlin.math.abs((a and 0xFF) - (b and 0xFF))
+    return dr + dg + db < 30
 }
 
 @Composable

@@ -688,6 +688,26 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         val hintH = if (settings.showHintBar) h * 0.14f else 0f
         val keyAreaH = h - topPad - suggestH - hintH
         val keyAreaW = w - sidePad * 2
+
+        // Suggestion row
+        if (row == -1) {
+            if (suggestions.isEmpty()) return null
+            val chipH = suggestH * 0.80f
+            val chipY = topPad + (suggestH - chipH) / 2
+            val chipSpacing = 6f * dp
+            // Approximate position — compact chips
+            var xCursor = sidePad
+            val c = col.coerceIn(0, (suggestions.size - 1).coerceAtLeast(0))
+            for (i in 0..c) {
+                if (i >= suggestions.size) break
+                val tw = suggPaint.measureText(suggestions[i])
+                val cw = tw + 20f * dp
+                if (i == c) return RectF(xCursor, chipY, xCursor + cw, chipY + chipH)
+                xCursor += cw + chipSpacing
+            }
+            return null
+        }
+
         val rows = rowCount()
         val maxCols = (0 until rows).maxOf { colCount(it) }
         val keySpacing = 3f * dp
