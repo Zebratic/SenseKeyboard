@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="logo.png" alt="SenseKeyboard" width="128" />
-</p>
-
 <h1 align="center">SenseKeyboard 🎮</h1>
 
 <p align="center"><strong>PS5-style on-screen keyboard for Android TV</strong>, designed for DualSense and other game controllers.</p>
