@@ -92,6 +92,15 @@ class KeyboardSettings(context: Context) {
         get() = prefs.getBoolean("number_row", false)
         set(v) = prefs.edit().putBoolean("number_row", v).apply()
 
+    // Font
+    var fontFamily: String
+        get() = prefs.getString("font_family", "default") ?: "default"
+        set(v) = prefs.edit().putString("font_family", v).apply()
+
+    var fontScale: Int
+        get() = prefs.getInt("font_scale", 100) // percentage
+        set(v) = prefs.edit().putInt("font_scale", v.coerceIn(50, 200)).apply()
+
     // Border-only highlight (vs filled key)
     var borderHighlight: Boolean
         get() = prefs.getBoolean("border_highlight", true)

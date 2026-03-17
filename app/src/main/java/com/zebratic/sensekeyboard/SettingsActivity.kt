@@ -351,6 +351,29 @@ fun SettingsTab() {
 
             Spacer(modifier = Modifier.height(10.dp))
             GlassCard {
+                SectionLabel("Font")
+                var selectedFont by remember { mutableStateOf(settings.fontFamily) }
+                var fontScale by remember { mutableFloatStateOf(settings.fontScale.toFloat()) }
+                DropdownSetting(
+                    options = listOf(
+                        "default" to "Default (Sans Medium)",
+                        "sans-serif-light" to "Sans Light",
+                        "sans-serif-condensed" to "Sans Condensed",
+                        "sans-serif-thin" to "Sans Thin",
+                        "monospace" to "Monospace",
+                        "serif" to "Serif",
+                        "casual" to "Casual",
+                        "cursive" to "Cursive"
+                    ),
+                    selected = selectedFont,
+                    onSelected = { selectedFont = it; settings.fontFamily = it }
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                SettingSlider("Font Scale", fontScale, 50f, 200f, "%") { fontScale = it; settings.fontScale = it.toInt() }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            GlassCard {
                 SectionLabel("Behavior")
                 SettingSwitch("Word Suggestions", suggestions) { suggestions = it; settings.suggestionsEnabled = it }
                 Spacer(modifier = Modifier.height(6.dp))

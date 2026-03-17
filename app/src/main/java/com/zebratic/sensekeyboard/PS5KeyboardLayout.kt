@@ -126,6 +126,25 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         textPaint.color = settings.textColor or (0xFF shl 24).toInt()
         dimTextPaint.color = Color.argb(160,
             Color.red(settings.textColor), Color.green(settings.textColor), Color.blue(settings.textColor))
+
+        // Font family
+        val tf = when (settings.fontFamily) {
+            "monospace" -> Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+            "serif" -> Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+            "sans-serif-light" -> Typeface.create("sans-serif-light", Typeface.NORMAL)
+            "sans-serif-condensed" -> Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+            "sans-serif-thin" -> Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            "casual" -> Typeface.create("casual", Typeface.NORMAL)
+            "cursive" -> Typeface.create("cursive", Typeface.NORMAL)
+            else -> Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        val tfBold = Typeface.create(tf, Typeface.BOLD)
+        textPaint.typeface = tfBold
+        dimTextPaint.typeface = tf
+        suggPaint.typeface = tf
+        suggFocusPaint.typeface = tfBold
+        hintPaint.typeface = tf
+        hintBtnPaint.typeface = tfBold
     }
 
     private val DIALPAD_ROWS = arrayOf(
@@ -272,8 +291,9 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         val keyStartY = topPad + suggestH
         val cr = 6f * dp
 
-        textPaint.textSize = keyH * 0.38f
-        dimTextPaint.textSize = keyH * 0.33f
+        val fontMul = settings.fontScale / 100f
+        textPaint.textSize = keyH * 0.38f * fontMul
+        dimTextPaint.textSize = keyH * 0.33f * fontMul
 
         for (row in 0 until rows) {
             val chars = getChars(row)
