@@ -106,6 +106,29 @@ class KeyboardSettings(context: Context) {
         get() = prefs.getBoolean("border_highlight", true)
         set(v) = prefs.edit().putBoolean("border_highlight", v).apply()
 
+    // Action bar buttons
+    var showSpacebar: Boolean
+        get() = prefs.getBoolean("show_spacebar", true)
+        set(v) = prefs.edit().putBoolean("show_spacebar", v).apply()
+    var showEnterBtn: Boolean
+        get() = prefs.getBoolean("show_enter", true)
+        set(v) = prefs.edit().putBoolean("show_enter", v).apply()
+    var showBackspaceBtn: Boolean
+        get() = prefs.getBoolean("show_backspace", true)
+        set(v) = prefs.edit().putBoolean("show_backspace", v).apply()
+    var showArrowKeys: Boolean
+        get() = prefs.getBoolean("show_arrows", true)
+        set(v) = prefs.edit().putBoolean("show_arrows", v).apply()
+    var showVoiceBtn: Boolean
+        get() = prefs.getBoolean("show_voice", true)
+        set(v) = prefs.edit().putBoolean("show_voice", v).apply()
+    var showSymbolsBtn: Boolean
+        get() = prefs.getBoolean("show_symbols", true)
+        set(v) = prefs.edit().putBoolean("show_symbols", v).apply()
+    var showDialpadBtn: Boolean
+        get() = prefs.getBoolean("show_dialpad", true)
+        set(v) = prefs.edit().putBoolean("show_dialpad", v).apply()
+
     // D-pad repeat speed (ms)
     var dpadRepeatRate: Int
         get() = prefs.getInt("dpad_repeat_rate", 80)

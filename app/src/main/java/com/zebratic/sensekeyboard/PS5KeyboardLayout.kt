@@ -252,9 +252,10 @@ class PS5KeyboardLayout @JvmOverloads constructor(
 
         val sidePad = w * 0.04f
         val topPad = h * 0.06f
-        val suggestH = h * 0.12f      // suggestion row
-        val hintH = h * 0.20f         // hint bar (bigger!)
-        val keyAreaH = h - topPad - suggestH - hintH
+        val suggestH = h * 0.10f      // suggestion row
+        val actionBarH = if (hasActionButtons()) h * 0.11f else 0f
+        val hintH = h * 0.16f         // hint bar
+        val keyAreaH = h - topPad - suggestH - actionBarH - hintH
         val keyAreaW = w - sidePad * 2
 
         // --- Status bar ---
@@ -337,6 +338,12 @@ class PS5KeyboardLayout @JvmOverloads constructor(
             }
         }
 
+        // --- Action bar ---
+        if (hasActionButtons()) {
+            val actionY = topPad + suggestH + keyAreaH
+            drawActionBar(canvas, sidePad, actionY, keyAreaW, actionBarH)
+        }
+
         // --- Hint bar ---
         drawHintBar(canvas, w, h, hintH, sidePad)
 
@@ -374,7 +381,7 @@ class PS5KeyboardLayout @JvmOverloads constructor(
     private fun drawHintBar(canvas: Canvas, w: Float, h: Float, hintH: Float, sidePad: Float) {
         val hints = arrayOf(
             "✕" to "Select", "△" to "Space", "□" to "Delete",
-            "○" to "Close", "L2" to "Shift", "L3" to "Symbols", "R2" to "Enter", "Share" to "Voice"
+            "○" to "Close", "L2" to "Shift", "L3" to "Symbols", "R2" to "Enter"
         )
 
         val barY = h - hintH
@@ -411,9 +418,66 @@ class PS5KeyboardLayout @JvmOverloads constructor(
 
     // --- Public API ---
 
+    private fun hasActionButtons(): Boolean {
+        val s = settings
+        return s.showSpacebar || s.showEnterBtn || s.showBackspaceBtn || s.showArrowKeys || s.showVoiceBtn || s.showSymbolsBtn || s.showDialpadBtn
+    }
+
+    private fun getActionButtons(): List<String> {
+        val btns = mutableListOf<String>()
+        if (settings.showArrowKeys) { btns.add("←"); btns.add("→") }
+        if (settings.showBackspaceBtn) btns.add("⌫")
+        if (settings.showSpacebar) btns.add("Space")
+        if (settings.showEnterBtn) btns.add("Enter")
+        if (settings.showSymbolsBtn) btns.add(if (symbolMode) "ABC" else "!@#")
+        if (settings.showDialpadBtn) btns.add(if (dialpadMode) "ABC" else "123")
+        if (settings.showVoiceBtn) btns.add("🎤")
+        return btns
+    }
+
+    private val actionBtnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE; textAlign = Paint.Align.CENTER
+    }
+
+    private fun drawActionBar(canvas: Canvas, sidePad: Float, y: Float, areaW: Float, barH: Float) {
+        val btns = getActionButtons()
+        if (btns.isEmpty()) return
+        val spacing = 4f * dp
+        val btnH = barH * 0.7f
+        val btnY = y + (barH - btnH) / 2
+        val btnW = (areaW - spacing * (btns.size - 1)) / btns.size
+        val cr = 6f * dp
+        val actionRow = rowCount() // action bar is the row after keys
+
+        actionBtnPaint.textSize = btnH * 0.4f
+
+        for ((i, label) in btns.withIndex()) {
+            val isFocused = focusRow == actionRow && focusCol == i
+            val bx = sidePad + i * (btnW + spacing)
+            val rect = RectF(bx, btnY, bx + btnW, btnY + btnH)
+
+            canvas.drawRoundRect(rect, cr, cr, keyPaint)
+            if (isFocused) {
+                if (settings.borderHighlight) {
+                    val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = focusPaint.color; style = Paint.Style.STROKE; strokeWidth = 2.5f * dp
+                    }
+                    canvas.drawRoundRect(rect, cr, cr, bp)
+                } else {
+                    canvas.drawRoundRect(rect, cr, cr, focusPaint)
+                }
+            }
+
+            actionBtnPaint.color = if (isFocused) android.graphics.Color.WHITE else android.graphics.Color.argb(180, 255, 255, 255)
+            actionBtnPaint.isFakeBoldText = isFocused
+            val textY = btnY + btnH / 2 - (actionBtnPaint.descent() + actionBtnPaint.ascent()) / 2
+            canvas.drawText(label, bx + btnW / 2, textY, actionBtnPaint)
+        }
+    }
+
     fun moveFocus(dx: Int, dy: Int) {
         val minRow = if (suggestions.isNotEmpty()) -1 else 0
-        val maxRow = rowCount() - 1
+        val maxRow = if (hasActionButtons()) rowCount() else rowCount() - 1
 
         // Vertical movement
         if (dy != 0) {
@@ -428,10 +492,10 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         }
 
         // Horizontal movement
-        val maxCol = if (focusRow == -1) {
-            (suggestions.size - 1).coerceAtLeast(0)
-        } else {
-            colCount(focusRow) - 1
+        val maxCol = when {
+            focusRow == -1 -> (suggestions.size - 1).coerceAtLeast(0)
+            hasActionButtons() && focusRow == rowCount() -> (getActionButtons().size - 1).coerceAtLeast(0)
+            else -> colCount(focusRow) - 1
         }
 
         if (dx != 0) {
@@ -482,6 +546,25 @@ class PS5KeyboardLayout @JvmOverloads constructor(
                 focusCol = focusCol.coerceAtMost((suggestions.size - 1).coerceAtLeast(0))
                 if (suggestions.isEmpty()) focusRow = 0
                 invalidate()
+            }
+            return
+        }
+
+        // Action bar row
+        if (hasActionButtons() && focusRow == rowCount()) {
+            val btns = getActionButtons()
+            if (focusCol < btns.size) {
+                when (btns[focusCol]) {
+                    "←" -> onCursorLeft?.invoke()
+                    "→" -> onCursorRight?.invoke()
+                    "⌫" -> onBackspace?.invoke()
+                    "Space" -> onSpace?.invoke()
+                    "Enter" -> onEnter?.invoke()
+                    "!@#", "ABC" -> toggleLayout()
+                    "123" -> toggleDialpad()
+                    "🎤" -> onSpeech?.invoke()
+                    else -> if (btns[focusCol] == "ABC" && dialpadMode) toggleDialpad()
+                }
             }
             return
         }

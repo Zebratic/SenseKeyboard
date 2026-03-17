@@ -297,6 +297,7 @@ fun SettingsTab() {
     var vWrap by remember { mutableStateOf(settings.verticalWrap) }
     var dpadSpeed by remember { mutableFloatStateOf(settings.dpadRepeatRate.toFloat()) }
 
+    Column {
     // Inline test input
     val focusManager = LocalFocusManager.current
     var testText by remember { mutableStateOf("") }
@@ -438,6 +439,34 @@ fun SettingsTab() {
             }
         }
     }
+
+    // Action bar buttons section
+    Spacer(modifier = Modifier.height(10.dp))
+    GlassCard {
+        SectionLabel("On-Screen Buttons")
+        var showSpacebar by remember { mutableStateOf(settings.showSpacebar) }
+        var showEnter by remember { mutableStateOf(settings.showEnterBtn) }
+        var showBackspace by remember { mutableStateOf(settings.showBackspaceBtn) }
+        var showArrows by remember { mutableStateOf(settings.showArrowKeys) }
+        var showVoice by remember { mutableStateOf(settings.showVoiceBtn) }
+        var showSymbols by remember { mutableStateOf(settings.showSymbolsBtn) }
+        var showDialpad by remember { mutableStateOf(settings.showDialpadBtn) }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                SettingSwitch("Spacebar", showSpacebar) { showSpacebar = it; settings.showSpacebar = it }
+                SettingSwitch("Enter", showEnter) { showEnter = it; settings.showEnterBtn = it }
+                SettingSwitch("Backspace", showBackspace) { showBackspace = it; settings.showBackspaceBtn = it }
+                SettingSwitch("Arrow Keys", showArrows) { showArrows = it; settings.showArrowKeys = it }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                SettingSwitch("Voice", showVoice) { showVoice = it; settings.showVoiceBtn = it }
+                SettingSwitch("Symbols", showSymbols) { showSymbols = it; settings.showSymbolsBtn = it }
+                SettingSwitch("Dialpad", showDialpad) { showDialpad = it; settings.showDialpadBtn = it }
+            }
+        }
+    }
+    } // close Column wrapper
 }
 
 @Composable
