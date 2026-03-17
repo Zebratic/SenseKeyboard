@@ -11,8 +11,8 @@ android {
         applicationId = "com.zebratic.sensekeyboard"
         minSdk = 21
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.0.0"
+        versionCode = 14
+        versionName = "1.0.4"
     }
 
     signingConfigs {
