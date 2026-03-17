@@ -58,8 +58,12 @@ class SettingsActivity : ComponentActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
 
+        // Config migration check
+        val migrationMessage = KeyboardSettings(this).migrateIfNeeded(this)
+
         setContent {
             var showExitDialog by remember { mutableStateOf(false) }
+            var showMigrationMsg by remember { mutableStateOf(migrationMessage) }
 
             // Handle back press
             DisposableEffect(Unit) {
@@ -85,6 +89,18 @@ class SettingsActivity : ComponentActivity() {
                     onConfirm = { finish() },
                     onDismiss = { showExitDialog = false }
                 )
+            }
+
+            if (showMigrationMsg != null) {
+                Dialog(onDismissRequest = { showMigrationMsg = null }) {
+                    GlassCard(modifier = Modifier.width(320.dp)) {
+                        Text("⚠️ Config Reset", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(showMigrationMsg!!, color = TextSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        AccentButton("OK") { showMigrationMsg = null }
+                    }
+                }
             }
         }
     }

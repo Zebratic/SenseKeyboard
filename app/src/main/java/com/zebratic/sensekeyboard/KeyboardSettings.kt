@@ -253,4 +253,95 @@ class KeyboardSettings(context: Context) {
             activePreset = "custom"
         }
     }
+
+    // --- Config Backup & Migration ---
+
+    companion object {
+        const val CONFIG_VERSION = 1  // Bump when settings format changes
+    }
+
+    private val configVersion: Int
+        get() = prefs.getInt("config_version", 0)
+
+    /** Backup all settings to a JSON string */
+    fun exportConfig(): String {
+        val map = prefs.all.toMutableMap()
+        map["config_version"] = CONFIG_VERSION
+        val sb = StringBuilder("{")
+        map.entries.forEachIndexed { i, (k, v) ->
+            if (i > 0) sb.append(",")
+            sb.append("\"$k\":")
+            when (v) {
+                is String -> sb.append("\"${v.replace("\"", "\\\"")}\"")
+                is Int -> sb.append(v)
+                is Long -> sb.append(v)
+                is Float -> sb.append(v)
+                is Boolean -> sb.append(v)
+                else -> sb.append("\"$v\"")
+            }
+        }
+        sb.append("}")
+        return sb.toString()
+    }
+
+    /** Restore settings from JSON string. Returns true on success. */
+    fun importConfig(json: String): Boolean {
+        return try {
+            val cleaned = json.trim().removeSurrounding("{", "}")
+            val editor = prefs.edit()
+            // Simple JSON parser for flat key-value pairs
+            val regex = Regex(""""([^"]+)"\s*:\s*("(?:[^"\\]|\\.)*"|true|false|-?\d+\.?\d*)\s*""")
+            var count = 0
+            for (match in regex.findAll(cleaned)) {
+                val key = match.groupValues[1]
+                val raw = match.groupValues[2]
+                when {
+                    raw == "true" -> editor.putBoolean(key, true)
+                    raw == "false" -> editor.putBoolean(key, false)
+                    raw.startsWith("\"") -> editor.putString(key, raw.removeSurrounding("\"").replace("\\\"", "\""))
+                    raw.contains(".") -> editor.putFloat(key, raw.toFloat())
+                    else -> editor.putInt(key, raw.toInt())
+                }
+                count++
+            }
+            if (count == 0) return false
+            editor.putInt("config_version", CONFIG_VERSION)
+            editor.apply()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Save config backup before update */
+    fun backupBeforeUpdate(context: Context) {
+        val backup = context.getSharedPreferences("sensekeyboard_backup", Context.MODE_PRIVATE)
+        backup.edit().putString("config_json", exportConfig()).putLong("backup_time", System.currentTimeMillis()).apply()
+    }
+
+    /** Check if migration is needed and handle it. Returns message or null. */
+    fun migrateIfNeeded(context: Context): String? {
+        val savedVersion = configVersion
+        if (savedVersion == CONFIG_VERSION) return null // up to date
+
+        if (savedVersion == 0) {
+            // Fresh install or pre-versioning — just stamp current version
+            prefs.edit().putInt("config_version", CONFIG_VERSION).apply()
+            return null
+        }
+
+        // Future: add migration logic per version
+        // e.g. if (savedVersion < 2) { migrate v1 -> v2 }
+
+        // If we can't migrate (future incompatible version), try backup restore
+        val backup = context.getSharedPreferences("sensekeyboard_backup", Context.MODE_PRIVATE)
+        val backupJson = backup.getString("config_json", null)
+        if (backupJson != null && importConfig(backupJson)) {
+            return null // restored successfully
+        }
+
+        // Can't restore — reset to defaults
+        prefs.edit().clear().putInt("config_version", CONFIG_VERSION).apply()
+        return "Your previous keyboard config is not compatible with this version. Settings have been reset to defaults. Sorry! :("
+    }
 }

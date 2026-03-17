@@ -53,6 +53,9 @@ object UpdateChecker {
 
     suspend fun downloadAndInstall(context: Context, url: String): Boolean = withContext(Dispatchers.IO) {
         try {
+            // Backup config before updating
+            KeyboardSettings(context).backupBeforeUpdate(context)
+
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.connectTimeout = 30000
             conn.readTimeout = 60000
