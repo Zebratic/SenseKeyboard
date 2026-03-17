@@ -79,13 +79,48 @@ class PS5KeyboardService : InputMethodService() {
                 }
             }
         }
-        return keyboardView!!
+        val settings = KeyboardSettings(this)
+        val dm = resources.displayMetrics
+        val kbW = settings.keyboardWidthPercent * dm.widthPixels / 100
+        val kbH = settings.keyboardHeightPercent * dm.heightPixels / 100
+
+        // The IME window is anchored to the bottom and sized by our view height.
+        // To support different Y anchors, we request full screen height and position keyboard inside.
+        val screenH = dm.heightPixels
+        val marginXPx = (settings.marginX * dm.widthPixels / 100)
+        val marginYPx = (settings.marginY * dm.heightPixels / 100)
+
+        val gravityH = when (settings.anchorX) { 0 -> android.view.Gravity.START; 2 -> android.view.Gravity.END; else -> android.view.Gravity.CENTER_HORIZONTAL }
+        val gravityV = when (settings.anchorY) { 0 -> android.view.Gravity.TOP; 1 -> android.view.Gravity.CENTER_VERTICAL; else -> android.view.Gravity.BOTTOM }
+
+        // Container requests enough height for keyboard + margins + positioning
+        val containerH = when (settings.anchorY) {
+            0 -> kbH + marginYPx * 2  // top: just keyboard + margins
+            1 -> screenH              // center: need full height
+            else -> kbH + marginYPx   // bottom: keyboard + bottom margin
+        }
+
+        val container = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(0x00000000)
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, containerH
+            )
+        }
+
+        val lp = android.widget.FrameLayout.LayoutParams(kbW, kbH).apply {
+            gravity = gravityH or gravityV
+            setMargins(marginXPx, marginYPx, marginXPx, marginYPx)
+        }
+        container.addView(keyboardView, lp)
+        return container
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         isKeyboardVisible = true
         keyboardView?.reloadSettings()
+        // Recreate layout to apply anchor/margin/size changes
+        setInputView(onCreateInputView())
         DebugLogger.log("IME", "onStartInputView visible=true restarting=$restarting")
         keyboardView?.resetFocus()
         GamepadInput.reset()
