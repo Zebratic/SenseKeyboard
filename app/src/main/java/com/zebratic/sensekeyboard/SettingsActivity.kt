@@ -32,7 +32,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -285,39 +291,187 @@ fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 // --- Setup Tab ---
 @Composable
 fun SetupTab(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        GlassCard(modifier = Modifier.weight(1f)) {
-            StepHeader("1", "Enable")
-            Text("Enable SenseKeyboard in input settings", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            AccentButton("Open Settings", onEnableKeyboard)
+    val context = LocalContext.current
+    val currentVersion = remember {
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" }
+        catch (_: Exception) { "?" }
+    }
+
+    Column {
+        // Banner
+        Image(
+            painter = painterResource(id = R.mipmap.ic_banner),
+            contentDescription = "SenseKeyboard Banner",
+            modifier = Modifier.fillMaxWidth().height(80.dp).clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Title
+        Text("SenseKeyboard", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Gamepad keyboard for Android TV — works with any controller", color = TextSecondary, fontSize = 10.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Setup steps
+        Text("Quick Setup", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassCard(modifier = Modifier.weight(1f)) {
+                StepHeader("1", "Enable")
+                Text("Allow SenseKeyboard in your device's input settings", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                AccentButton("Open Settings", onEnableKeyboard)
+            }
+            GlassCard(modifier = Modifier.weight(1f)) {
+                StepHeader("2", "Select")
+                Text("Set SenseKeyboard as your active keyboard", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                AccentButton("Select Keyboard", onSelectKeyboard)
+            }
+            GlassCard(modifier = Modifier.weight(1f)) {
+                StepHeader("3", "Type!")
+                Text("Open any text field and start typing with your gamepad controller", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+            }
         }
-        GlassCard(modifier = Modifier.weight(1f)) {
-            StepHeader("2", "Select")
-            Text("Set as active keyboard", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            AccentButton("Select", onSelectKeyboard)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Quick reference
+        Text("Controller Basics", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassCard(modifier = Modifier.weight(1f)) {
+                val controls = listOf(
+                    "D-pad" to "Navigate keys", "✕ / A" to "Type character",
+                    "△ / Y" to "Space", "□ / X" to "Backspace",
+                    "○ / B" to "Close keyboard"
+                )
+                controls.forEach { (btn, action) ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Text(btn, color = AccentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(50.dp))
+                        Text(action, color = TextSecondary, fontSize = 9.sp)
+                    }
+                }
+            }
+            GlassCard(modifier = Modifier.weight(1f)) {
+                val controls = listOf(
+                    "L1 / R1" to "Move cursor", "L2 hold" to "Shift (uppercase)",
+                    "L2 × 2" to "Caps lock", "R2" to "Enter",
+                    "L3" to "Symbols"
+                )
+                controls.forEach { (btn, action) ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Text(btn, color = AccentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(50.dp))
+                        Text(action, color = TextSecondary, fontSize = 9.sp)
+                    }
+                }
+            }
         }
-        GlassCard(modifier = Modifier.weight(1f)) {
-            StepHeader("3", "Type!")
-            Text("Open any text field. Connect DualSense via Bluetooth.", color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+
+        // Footer
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("v$currentVersion", color = TextSecondary, fontSize = 8.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("·", color = TextSecondary, fontSize = 8.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("by Zebratic", color = TextSecondary, fontSize = 8.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("·", color = TextSecondary, fontSize = 8.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("github.com/Zebratic/ps5-android-keyboard", color = AccentColor, fontSize = 8.sp)
+            Spacer(modifier = Modifier.weight(1f))
+            UpdateButton(context)
         }
     }
-    Spacer(modifier = Modifier.height(10.dp))
-    GlassCard {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("🎮", fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text("SenseKeyboard", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text("PS5 DualSense keyboard for Android TV", color = TextSecondary, fontSize = 9.sp)
+}
+
+@Composable
+fun UpdateButton(context: Context) {
+    var updateState by remember { mutableStateOf("idle") } // idle, checking, available, latest, downloading, error
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val (text, color) = when (updateState) {
+        "checking" -> "Checking..." to TextSecondary
+        "available" -> "Update to v${updateInfo?.version}" to Color(0xFF4CAF50)
+        "latest" -> "Up to date ✓" to Color(0xFF4CAF50)
+        "downloading" -> "Downloading..." to AccentColor
+        "error" -> "Check failed" to Color(0xFFFF6B6B)
+        else -> "Check for updates" to AccentColor
+    }
+
+    var isFocused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                    (event.key == androidx.compose.ui.input.key.Key.DirectionCenter ||
+                     event.key == androidx.compose.ui.input.key.Key.Enter ||
+                     event.key == androidx.compose.ui.input.key.Key.ButtonA)) {
+                    when (updateState) {
+                        "available" -> {
+                            updateState = "downloading"
+                            scope.launch {
+                                val ok = UpdateChecker.downloadAndInstall(context, updateInfo!!.downloadUrl)
+                                updateState = if (ok) "idle" else "error"
+                            }
+                        }
+                        "idle", "latest", "error" -> {
+                            updateState = "checking"
+                            scope.launch {
+                                val info = UpdateChecker.checkForUpdate(context)
+                                updateInfo = info
+                                updateState = when {
+                                    info == null -> "error"
+                                    info.isNewer -> "available"
+                                    else -> "latest"
+                                }
+                            }
+                        }
+                    }
+                    true
+                } else false
             }
-            Spacer(modifier = Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End) {
-                Text("by Zebratic", color = TextSecondary, fontSize = 9.sp)
-                Text("github.com/Zebratic/ps5-android-keyboard", color = AccentColor, fontSize = 8.sp)
+            .clickable {
+                when (updateState) {
+                    "available" -> {
+                        updateState = "downloading"
+                        scope.launch {
+                            val ok = UpdateChecker.downloadAndInstall(context, updateInfo!!.downloadUrl)
+                            updateState = if (ok) "idle" else "error"
+                        }
+                    }
+                    "idle", "latest", "error" -> {
+                        updateState = "checking"
+                        scope.launch {
+                            val info = UpdateChecker.checkForUpdate(context)
+                            updateInfo = info
+                            updateState = when {
+                                info == null -> "error"
+                                info.isNewer -> "available"
+                                else -> "latest"
+                            }
+                        }
+                    }
+                }
             }
-        }
+            .background(
+                if (isFocused) AccentColor.copy(alpha = 0.15f) else Color.Transparent,
+                RoundedCornerShape(6.dp)
+            )
+            .border(
+                if (isFocused) 1.dp else 0.dp,
+                if (isFocused) AccentColor else Color.Transparent,
+                RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
