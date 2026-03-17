@@ -70,9 +70,22 @@ class KeyboardSettings(context: Context) {
         get() = prefs.getBoolean("sound_enabled", false)
         set(v) = prefs.edit().putBoolean("sound_enabled", v).apply()
 
-    var vibrateEnabled: Boolean
-        get() = prefs.getBoolean("vibrate_enabled", true)
-        set(v) = prefs.edit().putBoolean("vibrate_enabled", v).apply()
+    var vibrateOnClick: Boolean
+        get() = prefs.getBoolean("vibrate_click", true)
+        set(v) = prefs.edit().putBoolean("vibrate_click", v).apply()
+
+    var vibrateOnMove: Boolean
+        get() = prefs.getBoolean("vibrate_move", false)
+        set(v) = prefs.edit().putBoolean("vibrate_move", v).apply()
+
+    var vibrateIntensity: Int
+        get() = prefs.getInt("vibrate_intensity", 50) // 0-100
+        set(v) = prefs.edit().putInt("vibrate_intensity", v.coerceIn(0, 100)).apply()
+
+    // Show hint bar at bottom
+    var showHintBar: Boolean
+        get() = prefs.getBoolean("show_hint_bar", true)
+        set(v) = prefs.edit().putBoolean("show_hint_bar", v).apply()
 
     var suggestionsEnabled: Boolean
         get() = prefs.getBoolean("suggestions_enabled", true)

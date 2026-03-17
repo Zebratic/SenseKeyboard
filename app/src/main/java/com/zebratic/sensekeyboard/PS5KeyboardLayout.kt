@@ -2,6 +2,10 @@ package com.zebratic.sensekeyboard
 
 import android.content.Context
 import android.graphics.*
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.AttributeSet
 import android.view.View
 
@@ -251,23 +255,20 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         val sidePad = w * 0.04f
-        val topPad = h * 0.06f
-        val suggestH = h * 0.10f      // suggestion row
+        val topPad = h * 0.03f
+        val showSuggestions = settings.suggestionsEnabled && suggestions.isNotEmpty()
+        val suggestH = if (showSuggestions) h * 0.10f else 0f
         val actionBarH = if (hasActionButtons()) h * 0.11f else 0f
-        val hintH = h * 0.16f         // hint bar
+        val hintH = if (settings.showHintBar) h * 0.14f else 0f
         val keyAreaH = h - topPad - suggestH - actionBarH - hintH
         val keyAreaW = w - sidePad * 2
 
-        // --- Status bar ---
-        val statusY = topPad * 0.7f
-        layoutLabelPaint.textSize = 11f * dp
-        val layoutLabel = if (symbolMode) "!@#" else getLetterLayout().name.uppercase()
-        canvas.drawText(layoutLabel, sidePad, statusY, layoutLabelPaint)
-
+        // --- Listening indicator (no language/shift status bar) ---
         if (listening) {
             listenPaint.textSize = 11f * dp
             val lt = "🎤 Listening..."
             val ltw = listenPaint.measureText(lt)
+            val statusY = topPad * 0.7f + 8f * dp
             canvas.drawRoundRect(
                 RectF(w/2 - ltw/2 - 12*dp, statusY - 10*dp, w/2 + ltw/2 + 12*dp, statusY + 6*dp),
                 6*dp, 6*dp, listenBgPaint
@@ -275,13 +276,10 @@ class PS5KeyboardLayout @JvmOverloads constructor(
             canvas.drawText(lt, w/2, statusY, listenPaint)
         }
 
-        if (shifted) {
-            shiftPaint.textSize = 11f * dp
-            canvas.drawText("⬆ SHIFT", w - sidePad, statusY, shiftPaint)
+        // --- Suggestion row (only if enabled and has suggestions) ---
+        if (showSuggestions) {
+            drawSuggestions(canvas, sidePad, topPad, keyAreaW, suggestH)
         }
-
-        // --- Suggestion row ---
-        drawSuggestions(canvas, sidePad, topPad, keyAreaW, suggestH)
 
         // --- Key grid ---
         val rows = rowCount()
@@ -345,7 +343,7 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         }
 
         // --- Hint bar ---
-        drawHintBar(canvas, w, h, hintH, sidePad)
+        if (settings.showHintBar) drawHintBar(canvas, w, h, hintH, sidePad)
 
         // Wind particles on top of everything
         drawWindParticles(canvas)
@@ -475,8 +473,33 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         }
     }
 
+    private fun vibrate(type: String) {
+        val shouldVibrate = when (type) {
+            "move" -> settings.vibrateOnMove
+            "click" -> settings.vibrateOnClick
+            else -> false
+        }
+        if (!shouldVibrate) return
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            val amplitude = (settings.vibrateIntensity * 255 / 100).coerceIn(1, 255)
+            val duration = if (type == "move") 10L else 25L
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(duration)
+            }
+        } catch (_: Exception) { }
+    }
+
     fun moveFocus(dx: Int, dy: Int) {
-        val minRow = if (suggestions.isNotEmpty()) -1 else 0
+        val minRow = if (settings.suggestionsEnabled && suggestions.isNotEmpty()) -1 else 0
         val maxRow = if (hasActionButtons()) rowCount() else rowCount() - 1
 
         // Vertical movement
@@ -511,6 +534,8 @@ class PS5KeyboardLayout @JvmOverloads constructor(
             focusCol = focusCol.coerceIn(0, maxCol)
         }
 
+        if (dx != 0 || dy != 0) vibrate("move")
+
         // Spawn wind particles
         if (dx != 0 || dy != 0) {
             lastMoveDir = when {
@@ -532,6 +557,7 @@ class PS5KeyboardLayout @JvmOverloads constructor(
     }
 
     fun pressCurrentKey() {
+        vibrate("click")
         if (focusRow == -1) {
             // Suggestion row — pick word, stay on row, show next-word predictions
             if (focusCol < suggestions.size) {
