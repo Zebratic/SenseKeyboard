@@ -69,6 +69,9 @@ object GamepadInput {
             KeyEvent.KEYCODE_BUTTON_R1 -> GamepadAction.CURSOR_RIGHT
             KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_MENU -> GamepadAction.ENTER
             KeyEvent.KEYCODE_BUTTON_THUMBL -> GamepadAction.SWITCH_LAYOUT
+            // Share button (DualSense maps to SELECT or MEDIA_RECORD on Android)
+            KeyEvent.KEYCODE_BUTTON_SELECT,
+            KeyEvent.KEYCODE_MEDIA_RECORD,
             KeyEvent.KEYCODE_BUTTON_THUMBR -> GamepadAction.SPEECH_INPUT
             else -> GamepadAction.NONE
         }

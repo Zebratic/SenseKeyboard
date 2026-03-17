@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -76,7 +78,7 @@ fun SenseKeyboardApp(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit)
             Spacer(modifier = Modifier.width(8.dp))
             Text("SenseKeyboard", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.width(24.dp))
-            listOf("Setup", "Settings", "Controls", "Test").forEachIndexed { i, label ->
+            listOf("Setup", "Settings", "Controls", "Test", "Debug").forEachIndexed { i, label ->
                 val isSelected = selectedTab == i
                 Box(
                     modifier = Modifier
@@ -110,6 +112,7 @@ fun SenseKeyboardApp(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit)
                 1 -> SettingsTab()
                 2 -> ControlsTab()
                 3 -> TestTab()
+                4 -> DebugTab()
             }
         }
     }
@@ -361,7 +364,7 @@ fun ControlsTab() {
         "✕ Cross" to "Select", "△ Triangle" to "Space", "□ Square" to "Backspace",
         "○ Circle" to "Close", "D-pad" to "Navigate", "L1 / R1" to "Cursor ←→",
         "L2 hold" to "Shift", "R2" to "Enter", "L2+R2" to "New line",
-        "L3" to "Symbols", "R3" to "Voice", "Options" to "Done"
+        "L3" to "Symbols", "Share" to "Voice", "Options" to "Done"
     )
 
     Column {
@@ -421,5 +424,249 @@ fun TestTab() {
             ),
             shape = RoundedCornerShape(8.dp)
         )
+    }
+}
+
+@Composable
+fun DebugTab() {
+    val context = LocalContext.current
+    var loggingEnabled by remember { mutableStateOf(DebugLogger.isEnabled()) }
+    var logs by remember { mutableStateOf(DebugLogger.getRecentLogs()) }
+    // Controller state
+    var pressedButtons by remember { mutableStateOf(setOf<String>()) }
+    var leftStick by remember { mutableStateOf(Pair(0f, 0f)) }
+    var rightStick by remember { mutableStateOf(Pair(0f, 0f)) }
+    var l2Value by remember { mutableFloatStateOf(0f) }
+    var r2Value by remember { mutableFloatStateOf(0f) }
+
+    // Refresh logs periodically
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            logs = DebugLogger.getRecentLogs()
+        }
+    }
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Left: Controller visualization
+        Column(modifier = Modifier.weight(1f)) {
+            SectionLabel("Controller Input")
+
+            // Controller body
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .background(CardColor, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                // D-pad (left side)
+                Column(
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ControllerButton("↑", "DPAD_UP" in pressedButtons)
+                    Row {
+                        ControllerButton("←", "DPAD_LEFT" in pressedButtons)
+                        Spacer(modifier = Modifier.width(20.dp))
+                        ControllerButton("→", "DPAD_RIGHT" in pressedButtons)
+                    }
+                    ControllerButton("↓", "DPAD_DOWN" in pressedButtons)
+                }
+
+                // Face buttons (right side)
+                Column(
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ControllerButton("△", "TRIANGLE" in pressedButtons, Color(0xFF00D4AA))
+                    Row {
+                        ControllerButton("□", "SQUARE" in pressedButtons, Color(0xFFFF6B9D))
+                        Spacer(modifier = Modifier.width(20.dp))
+                        ControllerButton("○", "CIRCLE" in pressedButtons, Color(0xFFFF6B6B))
+                    }
+                    ControllerButton("✕", "CROSS" in pressedButtons, Color(0xFF6B9FFF))
+                }
+
+                // Center info
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Shoulder buttons
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        MiniButton("L1", "L1" in pressedButtons)
+                        TriggerBar("L2", l2Value)
+                        TriggerBar("R2", r2Value)
+                        MiniButton("R1", "R1" in pressedButtons)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Stick indicators
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StickIndicator("L", leftStick.first, leftStick.second, "L3" in pressedButtons)
+                        StickIndicator("R", rightStick.first, rightStick.second, "R3" in pressedButtons)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        MiniButton("OPT", "OPTIONS" in pressedButtons)
+                        MiniButton("PS", "PS" in pressedButtons)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            // Active buttons list
+            Text("Active: ${if (pressedButtons.isEmpty()) "none" else pressedButtons.joinToString(", ")}",
+                color = if (pressedButtons.isEmpty()) TextSecondary else AccentColor,
+                fontSize = 10.sp)
+        }
+
+        // Right: Logs
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("Debug Logging")
+                Spacer(modifier = Modifier.weight(1f))
+                Switch(
+                    checked = loggingEnabled,
+                    onCheckedChange = { loggingEnabled = it; DebugLogger.setEnabled(context, it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White, checkedTrackColor = AccentColor,
+                        uncheckedThumbColor = TextSecondary, uncheckedTrackColor = CardColor
+                    ),
+                    modifier = Modifier.height(20.dp)
+                )
+            }
+
+            if (loggingEnabled) {
+                Text("Log file: ${DebugLogger.getLogFilePath()}", color = TextSecondary, fontSize = 8.sp)
+                Text("Read via: adb shell cat <path>", color = TextSecondary, fontSize = 8.sp)
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { logs = DebugLogger.getRecentLogs() },
+                    colors = ButtonDefaults.buttonColors(containerColor = CardColor),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(24.dp)
+                ) { Text("Refresh", fontSize = 9.sp, color = AccentColor) }
+                Button(
+                    onClick = { DebugLogger.clearLogs(); logs = emptyList() },
+                    colors = ButtonDefaults.buttonColors(containerColor = CardColor),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(24.dp)
+                ) { Text("Clear", fontSize = 9.sp, color = Color(0xFFFF6B6B)) }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            // Log output
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .background(Color(0xFF0A0B10), RoundedCornerShape(6.dp))
+                    .padding(6.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Column {
+                    if (logs.isEmpty()) {
+                        Text("No logs yet", color = TextSecondary.copy(alpha = 0.5f), fontSize = 9.sp)
+                    } else {
+                        logs.takeLast(50).forEach { line ->
+                            Text(
+                                line,
+                                color = when {
+                                    "ERROR" in line || "CRASH" in line -> Color(0xFFFF6B6B)
+                                    "WARN" in line -> Color(0xFFFFB86B)
+                                    "IME" in line -> Color(0xFF6BFFB8)
+                                    else -> TextSecondary
+                                },
+                                fontSize = 8.sp,
+                                lineHeight = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ControllerButton(label: String, pressed: Boolean, activeColor: Color = AccentColor) {
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .background(
+                if (pressed) activeColor else Color(0xFF1A1D2E),
+                RoundedCornerShape(14.dp)
+            )
+            .border(1.dp, if (pressed) activeColor else Color(0xFF3A3D4E), RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (pressed) Color.White else TextSecondary,
+            fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun MiniButton(label: String, pressed: Boolean) {
+    Box(
+        modifier = Modifier
+            .height(16.dp)
+            .background(if (pressed) AccentColor else Color(0xFF1A1D2E), RoundedCornerShape(4.dp))
+            .border(1.dp, if (pressed) AccentColor else Color(0xFF3A3D4E), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (pressed) Color.White else TextSecondary, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun TriggerBar(label: String, value: Float) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = TextSecondary, fontSize = 7.sp)
+        Box(
+            modifier = Modifier
+                .width(24.dp)
+                .height(12.dp)
+                .background(Color(0xFF1A1D2E), RoundedCornerShape(3.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(value.coerceIn(0f, 1f))
+                    .background(
+                        if (value > 0.5f) AccentColor else Color(0xFF3A3D4E),
+                        RoundedCornerShape(3.dp)
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+fun StickIndicator(label: String, x: Float, y: Float, pressed: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .background(Color(0xFF1A1D2E), RoundedCornerShape(18.dp))
+            .border(1.dp, if (pressed) AccentColor else Color(0xFF3A3D4E), RoundedCornerShape(18.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Dot showing stick position
+        val dotX = x * 10
+        val dotY = y * 10
+        Box(
+            modifier = Modifier
+                .offset(dotX.dp, dotY.dp)
+                .size(8.dp)
+                .background(if (pressed) AccentColor else Color(0xFF6B7280), RoundedCornerShape(4.dp))
+        )
+        Text(label, color = TextSecondary.copy(alpha = 0.3f), fontSize = 8.sp)
     }
 }

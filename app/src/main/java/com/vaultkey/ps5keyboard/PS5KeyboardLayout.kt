@@ -48,44 +48,6 @@ class PS5KeyboardLayout @JvmOverloads constructor(
     // Settings
     val settings = KeyboardSettings(context)
 
-    init {
-        currentLayoutId = settings.keyboardLayout
-        isFocusable = true
-        isFocusableInTouchMode = true
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
-        updatePaints()
-    }
-
-    fun reloadSettings() {
-        currentLayoutId = settings.keyboardLayout
-        updatePaints()
-        requestLayout()
-        invalidate()
-    }
-
-    private fun updatePaints() {
-        val alpha = (settings.bgOpacity * 255 / 100)
-        bgPaint.color = Color.argb(alpha,
-            Color.red(settings.bgColor), Color.green(settings.bgColor), Color.blue(settings.bgColor))
-        keyPaint.color = settings.keyColor or (0xFF shl 24).toInt()
-        focusPaint.color = settings.accentColor or (0xFF shl 24).toInt()
-        glowPaint.color = Color.argb(64,
-            Color.red(settings.accentColor), Color.green(settings.accentColor), Color.blue(settings.accentColor))
-        textPaint.color = settings.textColor or (0xFF shl 24).toInt()
-        dimTextPaint.color = Color.argb(160,
-            Color.red(settings.textColor), Color.green(settings.textColor), Color.blue(settings.textColor))
-    }
-
-    private fun getLetterLayout(): KeyboardLayoutDef = KeyboardLayouts.getById(currentLayoutId)
-
-    private fun getActiveRows(): Array<String> {
-        return if (symbolMode) KeyboardLayouts.SYMBOLS.rows else getLetterLayout().rows
-    }
-
-    private fun getChars(row: Int): List<String> = getActiveRows()[row].split(" ")
-    private fun rowCount() = getActiveRows().size
-    private fun colCount(row: Int) = getChars(row).size
-
     // Paints (initialized from settings, can be updated)
     private val dp = resources.displayMetrics.density
     private val bgPaint = Paint()
@@ -134,6 +96,44 @@ class PS5KeyboardLayout @JvmOverloads constructor(
         color = Color.parseColor("#660070D1"); textAlign = Paint.Align.LEFT
         typeface = Typeface.create("sans-serif", Typeface.NORMAL)
     }
+
+    init {
+        currentLayoutId = settings.keyboardLayout
+        isFocusable = true
+        isFocusableInTouchMode = true
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        updatePaints()
+    }
+
+    fun reloadSettings() {
+        currentLayoutId = settings.keyboardLayout
+        updatePaints()
+        requestLayout()
+        invalidate()
+    }
+
+    private fun updatePaints() {
+        val alpha = (settings.bgOpacity * 255 / 100)
+        bgPaint.color = Color.argb(alpha,
+            Color.red(settings.bgColor), Color.green(settings.bgColor), Color.blue(settings.bgColor))
+        keyPaint.color = settings.keyColor or (0xFF shl 24).toInt()
+        focusPaint.color = settings.accentColor or (0xFF shl 24).toInt()
+        glowPaint.color = Color.argb(64,
+            Color.red(settings.accentColor), Color.green(settings.accentColor), Color.blue(settings.accentColor))
+        textPaint.color = settings.textColor or (0xFF shl 24).toInt()
+        dimTextPaint.color = Color.argb(160,
+            Color.red(settings.textColor), Color.green(settings.textColor), Color.blue(settings.textColor))
+    }
+
+    private fun getLetterLayout(): KeyboardLayoutDef = KeyboardLayouts.getById(currentLayoutId)
+
+    private fun getActiveRows(): Array<String> {
+        return if (symbolMode) KeyboardLayouts.SYMBOLS.rows else getLetterLayout().rows
+    }
+
+    private fun getChars(row: Int): List<String> = getActiveRows()[row].split(" ")
+    private fun rowCount() = getActiveRows().size
+    private fun colCount(row: Int) = getChars(row).size
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val screenW = resources.displayMetrics.widthPixels
@@ -326,7 +326,7 @@ class PS5KeyboardLayout @JvmOverloads constructor(
     private fun drawHintBar(canvas: Canvas, w: Float, h: Float, hintH: Float, sidePad: Float) {
         val hints = arrayOf(
             "✕" to "Select", "△" to "Space", "□" to "Delete",
-            "○" to "Close", "L2" to "Shift", "L3" to "Symbols", "R2" to "Enter"
+            "○" to "Close", "L2" to "Shift", "L3" to "Symbols", "R2" to "Enter", "Share" to "Voice"
         )
 
         val barY = h - hintH

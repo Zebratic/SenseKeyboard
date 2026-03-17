@@ -17,6 +17,7 @@ class PS5KeyboardService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
+        DebugLogger.init(this)
         speechInput = SpeechInput(
             context = this,
             onResult = { text ->
@@ -30,6 +31,7 @@ class PS5KeyboardService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        DebugLogger.log("IME", "onCreateInputView called")
         keyboardView = PS5KeyboardLayout(this).apply {
             onCharInput = { char ->
                 currentInputConnection?.commitText(char.toString(), 1)
@@ -73,6 +75,7 @@ class PS5KeyboardService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         isKeyboardVisible = true
+        DebugLogger.log("IME", "onStartInputView visible=true restarting=$restarting")
         keyboardView?.resetFocus()
         GamepadInput.reset()
     }
