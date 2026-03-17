@@ -118,6 +118,8 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 fun SenseKeyboardApp(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showPreview by remember { mutableStateOf(false) }
+    var previewRefresh by remember { mutableIntStateOf(0) }
+    val refreshPreview: () -> Unit = { previewRefresh++ }
     val tabs = listOf("Setup", "Settings", "Controls", "Debug")
 
     Column(
@@ -198,7 +200,7 @@ fun SenseKeyboardApp(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit)
             ) {
                 when (selectedTab) {
                     0 -> SetupTab(onEnableKeyboard, onSelectKeyboard)
-                    1 -> SettingsTab(showPreview, { showPreview = it })
+                    1 -> SettingsTab(showPreview, { showPreview = it }, refreshPreview)
                     2 -> ControlsTab()
                     3 -> DebugTab()
                 }
@@ -207,55 +209,40 @@ fun SenseKeyboardApp(onEnableKeyboard: () -> Unit, onSelectKeyboard: () -> Unit)
             // Keyboard preview overlay — positioned like real keyboard
             if (showPreview) {
                 val context = LocalContext.current
-                val previewSettings = remember { KeyboardSettings(context) }
-                val screenW = LocalContext.current.resources.displayMetrics.widthPixels
-                val screenH = LocalContext.current.resources.displayMetrics.heightPixels
-                val kbW = previewSettings.keyboardWidthPercent * screenW / 100
-                val kbH = previewSettings.keyboardHeightPercent * screenH / 100
-                val marginXPx = previewSettings.marginX * screenW / 100
-                val marginYPx = previewSettings.marginY * screenH / 100
-                val density = LocalContext.current.resources.displayMetrics.density
+                val refreshKey = previewRefresh
+                val pvSettings = remember(refreshKey) { KeyboardSettings(context) }
+                val screenW = context.resources.displayMetrics.widthPixels
+                val screenH = context.resources.displayMetrics.heightPixels
+                val density = context.resources.displayMetrics.density
+                val kbW = pvSettings.keyboardWidthPercent * screenW / 100
+                val kbH = pvSettings.keyboardHeightPercent * screenH / 100
+                val mx = pvSettings.marginX * screenW / 100
+                val my = pvSettings.marginY * screenH / 100
 
-                val alignH = when (previewSettings.anchorX) {
-                    0 -> Alignment.Start; 2 -> Alignment.End; else -> Alignment.CenterHorizontally
-                }
-                val alignV = when (previewSettings.anchorY) {
-                    0 -> Alignment.Top; 1 -> Alignment.CenterVertically; else -> Alignment.Bottom
-                }
-                val align = when {
-                    alignV == Alignment.Top && alignH == Alignment.Start -> Alignment.TopStart
-                    alignV == Alignment.Top && alignH == Alignment.End -> Alignment.TopEnd
-                    alignV == Alignment.Top -> Alignment.TopCenter
-                    alignV == Alignment.CenterVertically && alignH == Alignment.Start -> Alignment.CenterStart
-                    alignV == Alignment.CenterVertically && alignH == Alignment.End -> Alignment.CenterEnd
-                    alignV == Alignment.CenterVertically -> Alignment.Center
-                    alignH == Alignment.Start -> Alignment.BottomStart
-                    alignH == Alignment.End -> Alignment.BottomEnd
-                    else -> Alignment.BottomCenter
+                val align = when (pvSettings.anchorY * 3 + pvSettings.anchorX) {
+                    0 -> Alignment.TopStart; 1 -> Alignment.TopCenter; 2 -> Alignment.TopEnd
+                    3 -> Alignment.CenterStart; 4 -> Alignment.Center; 5 -> Alignment.CenterEnd
+                    6 -> Alignment.BottomStart; 7 -> Alignment.BottomCenter; else -> Alignment.BottomEnd
                 }
 
                 Box(modifier = Modifier.fillMaxSize()
-                    .padding(
-                        start = (marginXPx / density).dp,
-                        end = (marginXPx / density).dp,
-                        top = (marginYPx / density).dp,
-                        bottom = (marginYPx / density).dp
-                    ),
+                    .padding(start = (mx / density).dp, end = (mx / density).dp,
+                        top = (my / density).dp, bottom = (my / density).dp),
                     contentAlignment = align
                 ) {
-                    AndroidView(
-                        factory = { ctx ->
-                            PS5KeyboardLayout(ctx).apply {
-                                reloadSettings()
-                                isFocusable = false
-                                isClickable = false
-                            }
-                        },
-                        modifier = Modifier
-                            .width((kbW / density).dp)
-                            .height((kbH / density).dp),
-                        update = { it.reloadSettings() }
-                    )
+                    key(refreshKey) {
+                        AndroidView(
+                            factory = { ctx ->
+                                PS5KeyboardLayout(ctx).apply {
+                                    reloadSettings()
+                                    isFocusable = false
+                                    isClickable = false
+                                }
+                            },
+                            modifier = Modifier.width((kbW / density).dp).height((kbH / density).dp),
+                            update = { view -> view.reloadSettings(); view.invalidate() }
+                        )
+                    }
                 }
             }
         }
@@ -501,7 +488,7 @@ fun AccentButton(text: String, onClick: () -> Unit) {
 
 // --- Settings Tab ---
 @Composable
-fun SettingsTab(showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit) {
+fun SettingsTab(showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit, refreshPreview: () -> Unit) {
     val context = LocalContext.current
     val settings = remember { KeyboardSettings(context) }
     var settingsSubTab by remember { mutableIntStateOf(0) }
@@ -509,7 +496,7 @@ fun SettingsTab(showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit) {
 
     // Shared state for preset detection
     var selectedPreset by remember { mutableStateOf(settings.detectPreset()) }
-    val markCustom = { settings.markCustomIfChanged(); selectedPreset = settings.activePreset }
+    val markCustom = { settings.markCustomIfChanged(); selectedPreset = settings.activePreset; refreshPreview() }
 
     Column {
         // Sub-tab navbar
@@ -561,12 +548,12 @@ fun SettingsTab(showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit) {
 
         // Sub-tab content
         when (settingsSubTab) {
-            0 -> SettingsGeneral(settings, selectedPreset, { selectedPreset = it }, markCustom, showPreview, onPreviewChanged)
-            1 -> SettingsProportions(settings, markCustom)
+            0 -> SettingsGeneral(settings, selectedPreset, { selectedPreset = it }, markCustom, showPreview, onPreviewChanged, refreshPreview)
+            1 -> SettingsProportions(settings, markCustom, refreshPreview)
             2 -> SettingsColors(settings, markCustom)
             3 -> SettingsEffects(settings, markCustom)
-            4 -> SettingsFont(settings)
-            5 -> SettingsKeys(settings, markCustom)
+            4 -> SettingsFont(settings, refreshPreview)
+            5 -> SettingsKeys(settings, markCustom, refreshPreview)
         }
     }
 }
@@ -625,7 +612,7 @@ private fun SettingsTestInput() {
 }
 
 @Composable
-private fun SettingsGeneral(settings: KeyboardSettings, selectedPreset: String, onPresetChanged: (String) -> Unit, markCustom: () -> Unit, showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit) {
+private fun SettingsGeneral(settings: KeyboardSettings, selectedPreset: String, onPresetChanged: (String) -> Unit, markCustom: () -> Unit, showPreview: Boolean, onPreviewChanged: (Boolean) -> Unit, refreshPreview: () -> Unit) {
     var selectedLayout by remember { mutableStateOf(settings.keyboardLayout) }
     var suggestions by remember { mutableStateOf(settings.suggestionsEnabled) }
     var numberRow by remember { mutableStateOf(settings.numberRowEnabled) }
@@ -642,7 +629,7 @@ private fun SettingsGeneral(settings: KeyboardSettings, selectedPreset: String, 
                 DropdownSetting(
                     options = KeyboardLayouts.ALL_LETTER_LAYOUTS.map { it.id to it.name },
                     selected = selectedLayout,
-                    onSelected = { selectedLayout = it; settings.keyboardLayout = it }
+                    onSelected = { selectedLayout = it; settings.keyboardLayout = it; refreshPreview() }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 SectionLabel("Visual Style Preset")
@@ -660,9 +647,9 @@ private fun SettingsGeneral(settings: KeyboardSettings, selectedPreset: String, 
         Column(modifier = Modifier.weight(1f)) {
             GlassCard {
                 SectionLabel("Behavior")
-                SettingSwitch("Word Suggestions", suggestions) { suggestions = it; settings.suggestionsEnabled = it }
-                SettingSwitch("Number Row", numberRow) { numberRow = it; settings.numberRowEnabled = it }
-                SettingSwitch("Show Hint Bar", showHintBar) { showHintBar = it; settings.showHintBar = it }
+                SettingSwitch("Word Suggestions", suggestions) { suggestions = it; settings.suggestionsEnabled = it; refreshPreview() }
+                SettingSwitch("Number Row", numberRow) { numberRow = it; settings.numberRowEnabled = it; refreshPreview() }
+                SettingSwitch("Show Hint Bar", showHintBar) { showHintBar = it; settings.showHintBar = it; refreshPreview() }
                 SettingSwitch("Horizontal Wrap", hWrap) { hWrap = it; settings.horizontalWrap = it }
                 SettingSwitch("Vertical Wrap", vWrap) { vWrap = it; settings.verticalWrap = it }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -689,7 +676,7 @@ private fun SettingsGeneral(settings: KeyboardSettings, selectedPreset: String, 
 }
 
 @Composable
-private fun SettingsProportions(settings: KeyboardSettings, markCustom: () -> Unit) {
+private fun SettingsProportions(settings: KeyboardSettings, markCustom: () -> Unit, refreshPreview: () -> Unit) {
     var kbHeight by remember { mutableFloatStateOf(settings.keyboardHeightPercent.toFloat()) }
     var kbWidth by remember { mutableFloatStateOf(settings.keyboardWidthPercent.toFloat()) }
     var bgOpacity by remember { mutableFloatStateOf(settings.bgOpacity.toFloat()) }
@@ -702,8 +689,8 @@ private fun SettingsProportions(settings: KeyboardSettings, markCustom: () -> Un
         Column(modifier = Modifier.weight(1f)) {
             GlassCard {
                 SectionLabel("Size")
-                SettingSlider("Height", kbHeight, 20f, 60f, "%") { kbHeight = it; settings.keyboardHeightPercent = it.toInt() }
-                SettingSlider("Width", kbWidth, 50f, 100f, "%") { kbWidth = it; settings.keyboardWidthPercent = it.toInt() }
+                SettingSlider("Height", kbHeight, 20f, 60f, "%") { kbHeight = it; settings.keyboardHeightPercent = it.toInt(); refreshPreview() }
+                SettingSlider("Width", kbWidth, 50f, 100f, "%") { kbWidth = it; settings.keyboardWidthPercent = it.toInt(); refreshPreview() }
                 SettingSlider("Opacity", bgOpacity, 0f, 100f, "%") { bgOpacity = it; settings.bgOpacity = it.toInt(); markCustom() }
             }
         }
@@ -712,14 +699,14 @@ private fun SettingsProportions(settings: KeyboardSettings, markCustom: () -> Un
                 SectionLabel("Position")
                 Text("X Anchor", color = TextSecondary, fontSize = 10.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                AnchorPicker(options = listOf("Left", "Center", "Right"), selected = anchorX, onSelected = { anchorX = it; settings.anchorX = it })
+                AnchorPicker(options = listOf("Left", "Center", "Right"), selected = anchorX, onSelected = { anchorX = it; settings.anchorX = it; refreshPreview() })
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Y Anchor", color = TextSecondary, fontSize = 10.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                AnchorPicker(options = listOf("Top", "Center", "Bottom"), selected = anchorY, onSelected = { anchorY = it; settings.anchorY = it })
+                AnchorPicker(options = listOf("Top", "Center", "Bottom"), selected = anchorY, onSelected = { anchorY = it; settings.anchorY = it; refreshPreview() })
                 Spacer(modifier = Modifier.height(8.dp))
-                SettingSlider("X Margin", marginX, 0f, 20f, "%") { marginX = it; settings.marginX = it.toInt() }
-                SettingSlider("Y Margin", marginY, 0f, 20f, "%") { marginY = it; settings.marginY = it.toInt() }
+                SettingSlider("X Margin", marginX, 0f, 20f, "%") { marginX = it; settings.marginX = it.toInt(); refreshPreview() }
+                SettingSlider("Y Margin", marginY, 0f, 20f, "%") { marginY = it; settings.marginY = it.toInt(); refreshPreview() }
             }
         }
     }
@@ -812,7 +799,7 @@ private fun SettingsEffects(settings: KeyboardSettings, markCustom: () -> Unit) 
 }
 
 @Composable
-private fun SettingsFont(settings: KeyboardSettings) {
+private fun SettingsFont(settings: KeyboardSettings, refreshPreview: () -> Unit) {
     var selectedFont by remember { mutableStateOf(settings.fontFamily) }
     var fontScale by remember { mutableFloatStateOf(settings.fontScale.toFloat()) }
 
@@ -822,14 +809,14 @@ private fun SettingsFont(settings: KeyboardSettings) {
             options = listOf("default" to "Default (Sans Medium)", "sans-serif-light" to "Sans Light",
                 "sans-serif-condensed" to "Sans Condensed", "sans-serif-thin" to "Sans Thin",
                 "monospace" to "Monospace", "serif" to "Serif", "casual" to "Casual", "cursive" to "Cursive"),
-            selected = selectedFont, onSelected = { selectedFont = it; settings.fontFamily = it })
+            selected = selectedFont, onSelected = { selectedFont = it; settings.fontFamily = it; refreshPreview() })
         Spacer(modifier = Modifier.height(6.dp))
-        SettingSlider("Font Scale", fontScale, 50f, 200f, "%") { fontScale = it; settings.fontScale = it.toInt() }
+        SettingSlider("Font Scale", fontScale, 50f, 200f, "%") { fontScale = it; settings.fontScale = it.toInt(); refreshPreview() }
     }
 }
 
 @Composable
-private fun SettingsKeys(settings: KeyboardSettings, markCustom: () -> Unit) {
+private fun SettingsKeys(settings: KeyboardSettings, markCustom: () -> Unit, refreshPreview: () -> Unit) {
     var keyRounding by remember { mutableFloatStateOf(settings.keyRounding.toFloat()) }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -852,15 +839,15 @@ private fun SettingsKeys(settings: KeyboardSettings, markCustom: () -> Unit) {
                 var showCopy by remember { mutableStateOf(settings.showCopyBtn) }
                 var showPaste by remember { mutableStateOf(settings.showPasteBtn) }
 
-                SettingSwitch("Spacebar", showSpacebar) { showSpacebar = it; settings.showSpacebar = it }
-                SettingSwitch("Enter", showEnter) { showEnter = it; settings.showEnterBtn = it }
-                SettingSwitch("Backspace", showBackspace) { showBackspace = it; settings.showBackspaceBtn = it }
-                SettingSwitch("Arrow Keys", showArrows) { showArrows = it; settings.showArrowKeys = it }
-                SettingSwitch("Voice", showVoice) { showVoice = it; settings.showVoiceBtn = it }
-                SettingSwitch("Symbols", showSymbols) { showSymbols = it; settings.showSymbolsBtn = it }
-                SettingSwitch("Dialpad", showDialpad) { showDialpad = it; settings.showDialpadBtn = it }
-                SettingSwitch("Copy", showCopy) { showCopy = it; settings.showCopyBtn = it }
-                SettingSwitch("Paste", showPaste) { showPaste = it; settings.showPasteBtn = it }
+                SettingSwitch("Spacebar", showSpacebar) { showSpacebar = it; settings.showSpacebar = it; refreshPreview() }
+                SettingSwitch("Enter", showEnter) { showEnter = it; settings.showEnterBtn = it; refreshPreview() }
+                SettingSwitch("Backspace", showBackspace) { showBackspace = it; settings.showBackspaceBtn = it; refreshPreview() }
+                SettingSwitch("Arrow Keys", showArrows) { showArrows = it; settings.showArrowKeys = it; refreshPreview() }
+                SettingSwitch("Voice", showVoice) { showVoice = it; settings.showVoiceBtn = it; refreshPreview() }
+                SettingSwitch("Symbols", showSymbols) { showSymbols = it; settings.showSymbolsBtn = it; refreshPreview() }
+                SettingSwitch("Dialpad", showDialpad) { showDialpad = it; settings.showDialpadBtn = it; refreshPreview() }
+                SettingSwitch("Copy", showCopy) { showCopy = it; settings.showCopyBtn = it; refreshPreview() }
+                SettingSwitch("Paste", showPaste) { showPaste = it; settings.showPasteBtn = it; refreshPreview() }
             }
         }
     }
