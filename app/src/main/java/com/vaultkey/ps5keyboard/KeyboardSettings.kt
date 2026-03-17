@@ -1,0 +1,119 @@
+package com.vaultkey.ps5keyboard
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.Color
+
+/**
+ * All keyboard customization settings, persisted in SharedPreferences.
+ */
+class KeyboardSettings(context: Context) {
+
+    private val prefs: SharedPreferences = context.getSharedPreferences("sensekeyboard_settings", Context.MODE_PRIVATE)
+
+    // Layout
+    var keyboardLayout: String
+        get() = prefs.getString("layout", "us") ?: "us"
+        set(v) = prefs.edit().putString("layout", v).apply()
+
+    // Visual - Colors (stored as hex int)
+    var accentColor: Int
+        get() = prefs.getInt("accent_color", Color.parseColor("#0070D1"))
+        set(v) = prefs.edit().putInt("accent_color", v).apply()
+
+    var bgColor: Int
+        get() = prefs.getInt("bg_color", Color.parseColor("#1A1D2E"))
+        set(v) = prefs.edit().putInt("bg_color", v).apply()
+
+    var keyColor: Int
+        get() = prefs.getInt("key_color", Color.parseColor("#2A2D3E"))
+        set(v) = prefs.edit().putInt("key_color", v).apply()
+
+    var textColor: Int
+        get() = prefs.getInt("text_color", Color.WHITE)
+        set(v) = prefs.edit().putInt("text_color", v).apply()
+
+    // Visual - Opacity (0-100)
+    var bgOpacity: Int
+        get() = prefs.getInt("bg_opacity", 90)
+        set(v) = prefs.edit().putInt("bg_opacity", v.coerceIn(0, 100)).apply()
+
+    // Visual - Size
+    var keyboardHeightPercent: Int
+        get() = prefs.getInt("kb_height_pct", 35)
+        set(v) = prefs.edit().putInt("kb_height_pct", v.coerceIn(20, 60)).apply()
+
+    var keyboardWidthPercent: Int
+        get() = prefs.getInt("kb_width_pct", 100)
+        set(v) = prefs.edit().putInt("kb_width_pct", v.coerceIn(50, 100)).apply()
+
+    // Visual - Position (0=bottom, 50=center, 100=top)
+    var keyboardPosition: Int
+        get() = prefs.getInt("kb_position", 0)
+        set(v) = prefs.edit().putInt("kb_position", v.coerceIn(0, 100)).apply()
+
+    // Behavior
+    var soundEnabled: Boolean
+        get() = prefs.getBoolean("sound_enabled", false)
+        set(v) = prefs.edit().putBoolean("sound_enabled", v).apply()
+
+    var vibrateEnabled: Boolean
+        get() = prefs.getBoolean("vibrate_enabled", true)
+        set(v) = prefs.edit().putBoolean("vibrate_enabled", v).apply()
+
+    var suggestionsEnabled: Boolean
+        get() = prefs.getBoolean("suggestions_enabled", true)
+        set(v) = prefs.edit().putBoolean("suggestions_enabled", v).apply()
+
+    // Wrapping
+    var horizontalWrap: Boolean
+        get() = prefs.getBoolean("horizontal_wrap", true)
+        set(v) = prefs.edit().putBoolean("horizontal_wrap", v).apply()
+
+    var verticalWrap: Boolean
+        get() = prefs.getBoolean("vertical_wrap", false)
+        set(v) = prefs.edit().putBoolean("vertical_wrap", v).apply()
+
+    // D-pad repeat speed (ms)
+    var dpadRepeatRate: Int
+        get() = prefs.getInt("dpad_repeat_rate", 80)
+        set(v) = prefs.edit().putInt("dpad_repeat_rate", v.coerceIn(30, 200)).apply()
+
+    var dpadInitialDelay: Int
+        get() = prefs.getInt("dpad_initial_delay", 400)
+        set(v) = prefs.edit().putInt("dpad_initial_delay", v.coerceIn(100, 800)).apply()
+
+    // Presets
+    fun applyPreset(preset: String) {
+        when (preset) {
+            "ps5" -> {
+                accentColor = Color.parseColor("#0070D1")
+                bgColor = Color.parseColor("#1A1D2E")
+                keyColor = Color.parseColor("#2A2D3E")
+                textColor = Color.WHITE
+                bgOpacity = 90
+            }
+            "dark" -> {
+                accentColor = Color.parseColor("#BB86FC")
+                bgColor = Color.parseColor("#121212")
+                keyColor = Color.parseColor("#1E1E1E")
+                textColor = Color.WHITE
+                bgOpacity = 95
+            }
+            "xbox" -> {
+                accentColor = Color.parseColor("#107C10")
+                bgColor = Color.parseColor("#1A1A2E")
+                keyColor = Color.parseColor("#2D2D44")
+                textColor = Color.WHITE
+                bgOpacity = 90
+            }
+            "steam" -> {
+                accentColor = Color.parseColor("#1A9FFF")
+                bgColor = Color.parseColor("#1B2838")
+                keyColor = Color.parseColor("#2A475E")
+                textColor = Color.parseColor("#C7D5E0")
+                bgOpacity = 92
+            }
+        }
+    }
+}
